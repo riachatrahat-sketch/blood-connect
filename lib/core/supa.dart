@@ -23,7 +23,19 @@ void showMsg(BuildContext context, String text) {
 }
 
 String friendlyError(Object e) {
-  if (e is AuthException) return e.message;
-  if (e is PostgrestException) return e.message;
+  if (e is AuthException) {
+    final m = e.message.toLowerCase();
+    if (m.contains('invalid login')) return 'Wrong mobile number or password.';
+    if (m.contains('already registered')) {
+      return 'This number is already registered. Please log in.';
+    }
+    return e.message;
+  }
+  if (e is PostgrestException) {
+    if (e.message.contains('duplicate key') && e.message.contains('phone')) {
+      return 'This number is already registered. Please log in.';
+    }
+    return e.message;
+  }
   return e.toString();
 }

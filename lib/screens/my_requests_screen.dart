@@ -5,10 +5,11 @@ import '../core/supa.dart';
 import '../models/models.dart';
 import '../providers.dart';
 import '../widgets/request_card.dart';
+import '../widgets/ui.dart';
 import 'post_request_screen.dart';
 import 'request_detail_screen.dart';
 
-/// Nijer post kora request er list (donor tab + anonymous requester dujoner jonno)
+/// List of the requests I posted (used in the donor tab and for account-less requesters)
 class MyRequestsList extends ConsumerWidget {
   final void Function(BloodRequest) onOpen;
   const MyRequestsList({super.key, required this.onOpen});
@@ -16,6 +17,7 @@ class MyRequestsList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final mine = ref.watch(myRequestsProvider);
+    final scheme = Theme.of(context).colorScheme;
     return RefreshIndicator(
       onRefresh: () => ref.refresh(myRequestsProvider.future),
       child: mine.when(
@@ -28,15 +30,26 @@ class MyRequestsList extends ConsumerWidget {
         ]),
         data: (list) => ListView(
           physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.only(bottom: 96, top: 6),
+          padding: const EdgeInsets.only(bottom: 100, top: 6),
           children: [
             if (list.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(32),
-                child: Text(
-                  'Ekhono kono request post koren ni.\n'
-                  '"Blood lagbe" button e tap korun.',
-                  textAlign: TextAlign.center,
+              Padding(
+                padding: const EdgeInsets.fromLTRB(32, 60, 32, 0),
+                child: Column(
+                  children: [
+                    Icon(Icons.assignment_outlined,
+                        size: 56, color: scheme.outline),
+                    const SizedBox(height: 10),
+                    const Text('No requests yet',
+                        style: TextStyle(
+                            fontSize: 17, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Tap "Request blood" and matching donors nearby will be alerted.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: scheme.onSurfaceVariant),
+                    ),
+                  ],
                 ),
               ),
             for (final r in list)
@@ -48,7 +61,7 @@ class MyRequestsList extends ConsumerWidget {
   }
 }
 
-/// Account chara (anonymous) requester er home screen
+/// Home screen for account-less (anonymous) requesters
 class RequesterHome extends ConsumerWidget {
   const RequesterHome({super.key});
 
@@ -56,17 +69,17 @@ class RequesterHome extends ConsumerWidget {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Bahire jaben?'),
+        title: const Text('Leave?'),
         content: const Text(
-            'Account chara post korechen tai bahire gele ei request gulo '
-            'ar dekhte parben na.'),
+            'You are using the app without an account. If you leave, you '
+            'will not be able to see these requests or chats again.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Thakbo')),
+              child: const Text('Stay')),
           FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Bahire jabo')),
+              child: const Text('Leave')),
         ],
       ),
     );
@@ -80,10 +93,11 @@ class RequesterHome extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Amar blood request'),
+        title: const Text('My requests',
+            style: TextStyle(fontWeight: FontWeight.w800)),
         actions: [
           IconButton(
-            tooltip: 'Bahire jan',
+            tooltip: 'Leave',
             onPressed: () => _leave(context),
             icon: const Icon(Icons.logout),
           ),
@@ -93,8 +107,10 @@ class RequesterHome extends ConsumerWidget {
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => Navigator.push(context,
             MaterialPageRoute(builder: (_) => const PostRequestScreen())),
+        backgroundColor: kRed,
+        foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
-        label: const Text('Blood lagbe'),
+        label: const Text('Request blood'),
       ),
     );
   }

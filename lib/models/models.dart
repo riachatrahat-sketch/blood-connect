@@ -70,6 +70,11 @@ class BloodRequest {
     this.exactMatch,
   });
 
+  /// Open and posted within the last 3 hours
+  bool get isUrgent =>
+      status == 'open' &&
+      DateTime.now().difference(createdAt) < const Duration(hours: 3);
+
   factory BloodRequest.fromMap(Map<String, dynamic> m) => BloodRequest(
         id: m['id'] as String,
         requesterId: m['requester_id'] as String?,

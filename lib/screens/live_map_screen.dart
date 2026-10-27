@@ -8,10 +8,12 @@ import 'package:latlong2/latlong.dart';
 import '../core/supa.dart';
 import '../models/models.dart';
 import '../services/location_service.dart';
+import '../widgets/ui.dart';
 
-/// Donor ar requester du jon er live location (Pathao/Uber er moto).
-/// Shudhu accept er por, ar request open thakle kaj kore (RLS e enforce kora).
-/// Screen bondho korle nijer location row delete hoye jay.
+/// Live location of donor and requester (like a ride-hailing app).
+/// Works only after the donor accepted and while the request is open
+/// (enforced by database security rules). Closing this screen deletes
+/// your own location row, so sharing stops.
 class LiveMapScreen extends StatefulWidget {
   final BloodRequest request;
   final String donorId;
@@ -35,7 +37,6 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
 
   LatLng? _me;
   LatLng? _other;
-  DateTime? _otherUpdated;
   String? _error;
 
   String get _myWho => widget.isRequester ? 'requester' : 'donor';
@@ -55,7 +56,8 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
     final first = await LocationService.current();
     if (!mounted) return;
     if (first == null) {
-      setState(() => _error = 'Location pawa jayni. GPS on kore permission din.');
+      setState(() =>
+          _error = 'Could not get your location. Turn on GPS and allow permission.');
     } else {
       final p = LatLng(first.latitude, first.longitude);
       setState(() => _me = p);
@@ -79,17 +81,13 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
           (r) => r['donor_id'] == widget.donorId && r['who'] == _otherWho);
       if (!mounted) return;
       if (match.isEmpty) {
-        setState(() {
-          _other = null;
-          _otherUpdated = null;
-        });
+        setState(() => _other = null);
         return;
       }
       final r = match.first;
       setState(() {
         _other = LatLng((r['latitude'] as num).toDouble(),
             (r['longitude'] as num).toDouble());
-        _otherUpdated = DateTime.tryParse(r['updated_at'] as String? ?? '')?.toLocal();
       });
     }, onError: (e) {
       if (mounted) setState(() => _error = friendlyError(e));
@@ -126,7 +124,7 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
   void dispose() {
     _posSub?.cancel();
     _locSub?.cancel();
-    _stopSharing(); // screen bondho = location share bondho
+    _stopSharing(); // leaving the screen stops sharing
     super.dispose();
   }
 
@@ -135,8 +133,8 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
     final m = Geolocator.distanceBetween(
         _me!.latitude, _me!.longitude, _other!.latitude, _other!.longitude);
     return m < 1000
-        ? '${m.round()} m dure'
-        : '${(m / 1000).toStringAsFixed(1)} km dure';
+        ? '${m.round()} m away'
+        : '${(m / 1000).toStringAsFixed(1)} km away';
   }
 
   @override
@@ -175,66 +173,68 @@ class _LiveMapScreenState extends State<LiveMapScreen> {
                     point: _other!,
                     width: 44,
                     height: 44,
-                    child: Icon(Icons.person_pin_circle,
-                        size: 42, color: scheme.primary),
+                    child: const Icon(Icons.person_pin_circle,
+                        size: 42, color: kRed),
                   ),
               ]),
             ],
           ),
           Positioned(
-            left: 12,
-            right: 12,
-            bottom: 16,
-            child: Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (_error != null)
-                      Text(_error!, style: TextStyle(color: scheme.error)),
-                    Row(children: [
-                      const Icon(Icons.navigation, color: Colors.blue, size: 18),
-                      const SizedBox(width: 6),
-                      const Text('Ami'),
-                      const SizedBox(width: 16),
-                      Icon(Icons.person_pin_circle,
-                          color: scheme.primary, size: 18),
-                      const SizedBox(width: 6),
-                      Text(_otherLabel),
-                      const SizedBox(width: 16),
-                      const Icon(Icons.local_hospital,
-                          color: Colors.green, size: 18),
-                      const SizedBox(width: 6),
-                      const Text('Hospital'),
-                    ]),
-                    const SizedBox(height: 6),
-                    Text(_other == null
-                        ? '$_otherLabel ekhono location share kore ni'
-                        : '$_otherLabel ${_distanceText()}'),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Ei screen khola thakle tobei apnar location share hoy.',
-                      style: TextStyle(fontSize: 11, color: Colors.grey[600]),
+            left: 0,
+            right: 0,
+            bottom: 12,
+            child: AppCard(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (_error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Text(_error!,
+                          style: TextStyle(color: scheme.error)),
                     ),
-                  ],
-                ),
+                  Wrap(spacing: 14, runSpacing: 4, children: [
+                    _legend(Icons.navigation, Colors.blue, 'You'),
+                    _legend(Icons.person_pin_circle, kRed, _otherLabel),
+                    _legend(Icons.local_hospital, Colors.green, 'Hospital'),
+                  ]),
+                  const SizedBox(height: 8),
+                  Text(
+                    _other == null
+                        ? '$_otherLabel is not sharing location yet'
+                        : '$_otherLabel is ${_distanceText()}',
+                    style: const TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w700),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Your location is shared only while this screen is open.',
+                    style:
+                        TextStyle(fontSize: 11, color: scheme.onSurfaceVariant),
+                  ),
+                ],
               ),
             ),
           ),
         ],
       ),
       floatingActionButton: Padding(
-        padding: const EdgeInsets.only(bottom: 120),
+        padding: const EdgeInsets.only(bottom: 130),
         child: FloatingActionButton.small(
-          onPressed: () {
-            final target = _me ?? _hospital;
-            _map.move(target, 15);
-          },
+          onPressed: () => _map.move(_me ?? _hospital, 15),
           child: const Icon(Icons.my_location),
         ),
       ),
     );
   }
+
+  Widget _legend(IconData icon, Color color, String text) => Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 4),
+          Text(text, style: const TextStyle(fontSize: 12)),
+        ],
+      );
 }

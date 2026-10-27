@@ -8,6 +8,7 @@ import '../core/config.dart';
 import '../core/supa.dart';
 import '../providers.dart';
 import '../services/location_service.dart';
+import '../widgets/ui.dart';
 
 class PostRequestScreen extends ConsumerStatefulWidget {
   const PostRequestScreen({super.key});
@@ -55,7 +56,7 @@ class _PostRequestScreenState extends ConsumerState<PostRequestScreen> {
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
     if (_group == null) {
-      showMsg(context, 'Kon blood group lagbe select korun');
+      showMsg(context, 'Please select the blood group needed');
       return;
     }
     final phone = normalizePhone(_phone.text)!;
@@ -83,7 +84,7 @@ class _PostRequestScreenState extends ConsumerState<PostRequestScreen> {
           .single();
       createdId = row['id'] as String;
 
-      // phone alada table e: shudhu accept kora donor dekhte pabe
+      // phone number lives in its own table: only accepted donors can read it
       await supabase
           .from('request_contacts')
           .insert({'request_id': createdId, 'phone': phone});
@@ -91,10 +92,9 @@ class _PostRequestScreenState extends ConsumerState<PostRequestScreen> {
       ref.invalidate(myRequestsProvider);
       if (!mounted) return;
       Navigator.pop(context);
-      showMsg(context,
-          'Request post hoyeche. Matching donor der kache alert gese.');
+      showMsg(context, 'Request posted. Matching donors nearby have been alerted.');
     } catch (e) {
-      // contact insert fail korle (jemon rate limit) request ta cancel kori
+      // if the contact insert fails (e.g. rate limit) cancel the request
       if (createdId != null) {
         try {
           await supabase
@@ -110,19 +110,20 @@ class _PostRequestScreenState extends ConsumerState<PostRequestScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Blood request post')),
+      appBar: AppBar(title: const Text('Request blood')),
       body: SafeArea(
         child: Form(
           key: _form,
           child: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
             children: [
               DropdownButtonFormField<String>(
                 value: _group,
                 decoration: const InputDecoration(
-                    labelText: 'Kon blood group lagbe?',
-                    prefixIcon: Icon(Icons.bloodtype)),
+                    labelText: 'Blood group needed',
+                    prefixIcon: Icon(Icons.bloodtype_outlined)),
                 items: bloodGroups
                     .map((g) => DropdownMenuItem(value: g, child: Text(g)))
                     .toList(),
@@ -132,51 +133,60 @@ class _PostRequestScreenState extends ConsumerState<PostRequestScreen> {
                 Padding(
                   padding: const EdgeInsets.only(top: 6, left: 4),
                   child: Text(
-                    'Ei group der kache alert jabe: ${donorGroupsFor(_group!).join(', ')}',
-                    style: TextStyle(fontSize: 12, color: Colors.grey[700]),
+                    'Donors alerted: ${donorGroupsFor(_group!).join(', ')}',
+                    style:
+                        TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
                   ),
                 ),
               const SizedBox(height: 14),
-              Row(
-                children: [
-                  const Text('Koy bag?'),
-                  const Spacer(),
-                  IconButton(
-                    onPressed:
-                        _units > 1 ? () => setState(() => _units--) : null,
-                    icon: const Icon(Icons.remove_circle_outline),
-                  ),
-                  Text('$_units',
-                      style: const TextStyle(
-                          fontSize: 18, fontWeight: FontWeight.bold)),
-                  IconButton(
-                    onPressed:
-                        _units < 10 ? () => setState(() => _units++) : null,
-                    icon: const Icon(Icons.add_circle_outline),
-                  ),
-                ],
+              AppCard(
+                margin: EdgeInsets.zero,
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                child: Row(
+                  children: [
+                    const Text('Bags needed',
+                        style: TextStyle(fontWeight: FontWeight.w600)),
+                    const Spacer(),
+                    IconButton(
+                      onPressed:
+                          _units > 1 ? () => setState(() => _units--) : null,
+                      icon: const Icon(Icons.remove_circle_outline),
+                    ),
+                    Text('$_units',
+                        style: const TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.w800)),
+                    IconButton(
+                      onPressed:
+                          _units < 10 ? () => setState(() => _units++) : null,
+                      icon: const Icon(Icons.add_circle_outline),
+                    ),
+                  ],
+                ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 14),
               TextFormField(
                 controller: _patient,
                 textCapitalization: TextCapitalization.words,
                 decoration: const InputDecoration(
-                    labelText: 'Rogir naam', prefixIcon: Icon(Icons.person)),
-                validator: (v) =>
-                    (v == null || v.trim().length < 2) ? 'Naam din' : null,
+                    labelText: 'Patient name',
+                    prefixIcon: Icon(Icons.person_outline)),
+                validator: (v) => (v == null || v.trim().length < 2)
+                    ? 'Enter the patient name'
+                    : null,
               ),
               const SizedBox(height: 14),
               TextFormField(
                 controller: _phone,
                 keyboardType: TextInputType.phone,
                 decoration: const InputDecoration(
-                  labelText: 'Jogajoger mobile number',
+                  labelText: 'Contact mobile number',
                   hintText: '01XXXXXXXXX',
-                  prefixIcon: Icon(Icons.phone),
-                  helperText: 'Donor accept korle tabei number dekhte pabe',
+                  prefixIcon: Icon(Icons.phone_outlined),
+                  helperText: 'Only donors who accept can see this number',
                 ),
                 validator: (v) => normalizePhone(v ?? '') == null
-                    ? 'Shothik BD number din (01XXXXXXXXX)'
+                    ? 'Enter a valid Bangladeshi number (01XXXXXXXXX)'
                     : null,
               ),
               const SizedBox(height: 14),
@@ -184,19 +194,22 @@ class _PostRequestScreenState extends ConsumerState<PostRequestScreen> {
                 controller: _hospital,
                 textCapitalization: TextCapitalization.words,
                 decoration: const InputDecoration(
-                    labelText: 'Hospital er naam',
-                    prefixIcon: Icon(Icons.local_hospital)),
-                validator: (v) =>
-                    (v == null || v.trim().length < 3) ? 'Hospital er naam din' : null,
+                    labelText: 'Hospital name',
+                    prefixIcon: Icon(Icons.local_hospital_outlined)),
+                validator: (v) => (v == null || v.trim().length < 3)
+                    ? 'Enter the hospital name'
+                    : null,
               ),
-              const SizedBox(height: 14),
-              const Text('Hospital er location (map e tap kore thik korun)',
-                  style: TextStyle(fontWeight: FontWeight.w600)),
+              const SizedBox(height: 18),
+              const Text('Hospital location',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+              Text('Tap the map to move the pin',
+                  style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant)),
               const SizedBox(height: 8),
               SizedBox(
                 height: 240,
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(16),
                   child: FlutterMap(
                     mapController: _map,
                     options: MapOptions(
@@ -215,9 +228,8 @@ class _PostRequestScreenState extends ConsumerState<PostRequestScreen> {
                           point: _point,
                           width: 44,
                           height: 44,
-                          child: Icon(Icons.location_on,
-                              size: 44,
-                              color: Theme.of(context).colorScheme.primary),
+                          child:
+                              const Icon(Icons.location_on, size: 44, color: kRed),
                         ),
                       ]),
                     ],
@@ -229,29 +241,32 @@ class _PostRequestScreenState extends ConsumerState<PostRequestScreen> {
                 child: TextButton.icon(
                   onPressed: _moveToMe,
                   icon: const Icon(Icons.my_location, size: 18),
-                  label: const Text('Amar location'),
+                  label: const Text('Use my location'),
                 ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               TextFormField(
                 controller: _note,
                 maxLines: 2,
                 decoration: const InputDecoration(
-                    labelText: 'Extra note (optional)',
-                    hintText: 'Jemon: Ward 5, Bed 12, operation ajke'),
+                    labelText: 'Note (optional)',
+                    hintText: 'e.g. Ward 5, Bed 12, surgery today'),
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 22),
               FilledButton.icon(
                 onPressed: _busy ? null : _submit,
                 icon: _busy
                     ? const SizedBox(
                         width: 18,
                         height: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2))
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: Colors.white))
                     : const Icon(Icons.send),
                 label: const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 14),
-                  child: Text('Request post korun'),
+                  padding: EdgeInsets.symmetric(vertical: 15),
+                  child: Text('Post request',
+                      style:
+                          TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
                 ),
               ),
             ],

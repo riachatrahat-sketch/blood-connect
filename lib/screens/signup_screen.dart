@@ -47,7 +47,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       _locBusy = false;
     });
     if (p == null) {
-      showMsg(context, 'Location pawa jayni. GPS on kore permission din.');
+      showMsg(context, 'Could not get your location. Turn on GPS and allow permission.');
     }
   }
 
@@ -65,17 +65,17 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
   Future<void> _submit() async {
     if (!_form.currentState!.validate()) return;
     if (_group == null) {
-      showMsg(context, 'Blood group select korun');
+      showMsg(context, 'Please select your blood group');
       return;
     }
     if (_pos == null) {
-      showMsg(context, 'Agey "Amar location nin" e tap korun');
+      showMsg(context, 'Please tap "Use my current location" first');
       return;
     }
     final phone = normalizePhone(_phone.text)!;
     setState(() => _busy = true);
     try {
-      // age kono anonymous session thakle sheta bondho
+      // close any leftover anonymous session first
       if (supabase.auth.currentSession != null) {
         await supabase.auth.signOut();
       }
@@ -85,8 +85,7 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
       );
       final user = res.user;
       if (user == null || res.session == null) {
-        throw 'Sign up complete hoyni. Supabase > Authentication > Providers > '
-            'Email e "Confirm email" off koren.';
+        throw 'Sign up did not complete. In Supabase > Authentication, turn off "Confirm email".';
       }
       await supabase.from('profiles').insert({
         'id': user.id,
@@ -112,21 +111,29 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Donor sign up')),
+      appBar: AppBar(title: const Text('Become a donor')),
       body: SafeArea(
         child: Form(
           key: _form,
           child: ListView(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
             children: [
+              Text('Your details',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
               TextFormField(
                 controller: _name,
                 textCapitalization: TextCapitalization.words,
                 decoration: const InputDecoration(
-                    labelText: 'Full name', prefixIcon: Icon(Icons.person)),
+                    labelText: 'Full name',
+                    prefixIcon: Icon(Icons.person_outline)),
                 validator: (v) =>
-                    (v == null || v.trim().length < 2) ? 'Naam din' : null,
+                    (v == null || v.trim().length < 2) ? 'Enter your name' : null,
               ),
               const SizedBox(height: 14),
               TextFormField(
@@ -135,10 +142,10 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 decoration: const InputDecoration(
                   labelText: 'Mobile number',
                   hintText: '01XXXXXXXXX',
-                  prefixIcon: Icon(Icons.phone),
+                  prefixIcon: Icon(Icons.phone_outlined),
                 ),
                 validator: (v) => normalizePhone(v ?? '') == null
-                    ? 'Shothik BD number din (01XXXXXXXXX)'
+                    ? 'Enter a valid Bangladeshi number (01XXXXXXXXX)'
                     : null,
               ),
               const SizedBox(height: 14),
@@ -146,21 +153,29 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                 controller: _pass,
                 obscureText: _hide,
                 decoration: InputDecoration(
-                  labelText: 'Password (min 6)',
-                  prefixIcon: const Icon(Icons.lock),
+                  labelText: 'Password (min 6 characters)',
+                  prefixIcon: const Icon(Icons.lock_outline),
                   suffixIcon: IconButton(
                     icon: Icon(_hide ? Icons.visibility : Icons.visibility_off),
                     onPressed: () => setState(() => _hide = !_hide),
                   ),
                 ),
-                validator: (v) =>
-                    (v == null || v.length < 6) ? 'Kom pokkhe 6 character' : null,
+                validator: (v) => (v == null || v.length < 6)
+                    ? 'At least 6 characters'
+                    : null,
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 22),
+              Text('Donation info',
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleMedium
+                      ?.copyWith(fontWeight: FontWeight.w700)),
+              const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 value: _group,
                 decoration: const InputDecoration(
-                    labelText: 'Blood group', prefixIcon: Icon(Icons.bloodtype)),
+                    labelText: 'Blood group',
+                    prefixIcon: Icon(Icons.bloodtype_outlined)),
                 items: bloodGroups
                     .map((g) => DropdownMenuItem(value: g, child: Text(g)))
                     .toList(),
@@ -170,8 +185,8 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
               TextFormField(
                 controller: _area,
                 decoration: const InputDecoration(
-                  labelText: 'Area (jemon: Uttara Sector 10)',
-                  prefixIcon: Icon(Icons.place),
+                  labelText: 'Area (e.g. Uttara Sector 10)',
+                  prefixIcon: Icon(Icons.place_outlined),
                 ),
               ),
               const SizedBox(height: 14),
@@ -183,36 +198,45 @@ class _SignUpScreenState extends ConsumerState<SignUpScreen> {
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2))
                     : Icon(_pos == null ? Icons.my_location : Icons.check_circle),
-                label: Text(_pos == null
-                    ? 'Amar location nin'
-                    : 'Location paoa gese (${_pos!.latitude.toStringAsFixed(4)}, '
-                        '${_pos!.longitude.toStringAsFixed(4)})'),
+                label: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(_pos == null
+                      ? 'Use my current location'
+                      : 'Location saved (${_pos!.latitude.toStringAsFixed(3)}, '
+                          '${_pos!.longitude.toStringAsFixed(3)})'),
+                ),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: _pickDate,
                 icon: const Icon(Icons.event),
-                label: Text(_lastDonation == null
-                    ? 'Last blood dewar tarikh (thakle)'
-                    : 'Last donation: ${DateFormat('dd MMM yyyy').format(_lastDonation!)}'),
+                label: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(_lastDonation == null
+                      ? 'Last donation date (if any)'
+                      : 'Last donation: ${DateFormat('dd MMM yyyy').format(_lastDonation!)}'),
+                ),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 8),
               Text(
-                'Last donation tarikh apni nijei dichchen (self-declared). '
-                '4 mash na hole app apnake blood request dekhabe na.',
-                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                'Self-declared. If you donated less than 4 months ago, '
+                'you will not see new requests until you are eligible again.',
+                style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
               ),
-              const SizedBox(height: 24),
+              const SizedBox(height: 26),
               FilledButton(
                 onPressed: _busy ? null : _submit,
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  padding: const EdgeInsets.symmetric(vertical: 15),
                   child: _busy
                       ? const SizedBox(
                           height: 20,
                           width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2))
-                      : const Text('Sign up'),
+                          child: CircularProgressIndicator(
+                              strokeWidth: 2, color: Colors.white))
+                      : const Text('Create account',
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w700)),
                 ),
               ),
             ],

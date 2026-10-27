@@ -8,6 +8,7 @@ import '../models/models.dart';
 import '../providers.dart';
 import '../services/location_service.dart';
 import '../widgets/request_card.dart';
+import '../widgets/ui.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
   final Profile profile;
@@ -45,28 +46,28 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final p = await LocationService.current();
     if (!mounted) return;
     if (p == null) {
-      showMsg(context, 'Location pawa jayni. GPS on kore permission din.');
+      showMsg(context, 'Could not get your location. Turn on GPS and allow permission.');
       return;
     }
     await _update({'latitude': p.latitude, 'longitude': p.longitude});
-    if (mounted) showMsg(context, 'Location update hoyeche');
+    if (mounted) showMsg(context, 'Location updated');
   }
 
   Future<void> _donatedToday() async {
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Aj blood dilen?'),
+        title: const Text('Donated blood today?'),
         content: const Text(
-            'Last donation tarikh aj set hobe. Porer 4 mash apni notun '
-            'request dekhben na.'),
+            'Your last donation date will be set to today. You will not '
+            'receive new requests for the next 4 months.'),
         actions: [
           TextButton(
               onPressed: () => Navigator.pop(context, false),
-              child: const Text('Na')),
+              child: const Text('No')),
           FilledButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Hya')),
+              child: const Text('Yes')),
         ],
       ),
     );
@@ -78,100 +79,126 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final p = widget.profile;
+    final scheme = Theme.of(context).colorScheme;
     final eligible = isEligible(p.lastDonationDate);
     final next = nextDonationDate(p.lastDonationDate);
 
     return ListView(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.only(bottom: 32, top: 4),
       children: [
-        Row(
-          children: [
-            BloodBadge(p.bloodGroup, size: 64),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(p.fullName,
-                      style: const TextStyle(
-                          fontSize: 20, fontWeight: FontWeight.bold)),
-                  Text(p.phone),
-                  if (p.areaName != null) Text(p.areaName!),
-                ],
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-        Card(
-          color: eligible
-              ? Colors.green.withOpacity(0.12)
-              : Colors.orange.withOpacity(0.15),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(children: [
-              Icon(eligible ? Icons.check_circle : Icons.hourglass_bottom,
-                  color: eligible ? Colors.green : Colors.orange),
-              const SizedBox(width: 10),
+        AppCard(
+          child: Row(
+            children: [
+              BloodBadge(p.bloodGroup, size: 68),
+              const SizedBox(width: 16),
               Expanded(
-                child: Text(
-                  eligible
-                      ? (p.lastDonationDate == null
-                          ? 'Apni blood dite parben.'
-                          : 'Last donation: '
-                              '${DateFormat('dd MMM yyyy').format(p.lastDonationDate!)}. '
-                              'Apni ekhon blood dite parben.')
-                      : 'Last donation: '
-                          '${DateFormat('dd MMM yyyy').format(p.lastDonationDate!)}. '
-                          'Porer donation: ${DateFormat('dd MMM yyyy').format(next!)} er por.',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(p.fullName,
+                        style: const TextStyle(
+                            fontSize: 20, fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text(p.phone,
+                        style: TextStyle(color: scheme.onSurfaceVariant)),
+                    if (p.areaName != null)
+                      Text(p.areaName!,
+                          style: TextStyle(color: scheme.onSurfaceVariant)),
+                  ],
                 ),
               ),
-            ]),
+            ],
           ),
         ),
-        const SizedBox(height: 8),
-        SwitchListTile(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Available (blood dite ready)'),
-          subtitle: const Text('Off korle notun request dekhben na'),
-          value: p.isAvailable,
-          onChanged: (v) => _update({'is_available': v}),
+        AppCard(
+          color: eligible
+              ? Colors.green.withOpacity(0.12)
+              : Colors.orange.withOpacity(0.16),
+          borderColor: Colors.transparent,
+          child: Row(children: [
+            Icon(eligible ? Icons.check_circle : Icons.hourglass_bottom,
+                color: eligible ? Colors.green : Colors.orange),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                eligible
+                    ? (p.lastDonationDate == null
+                        ? 'You are eligible to donate.'
+                        : 'Last donation: '
+                            '${DateFormat('dd MMM yyyy').format(p.lastDonationDate!)}. '
+                            'You are eligible to donate again.')
+                    : 'Last donation: '
+                        '${DateFormat('dd MMM yyyy').format(p.lastDonationDate!)}. '
+                        'You can donate again after '
+                        '${DateFormat('dd MMM yyyy').format(next!)}.',
+              ),
+            ),
+          ]),
         ),
-        const Divider(),
-        Text('Alert radius: ${_radius.round()} km',
-            style: const TextStyle(fontWeight: FontWeight.w600)),
-        Slider(
-          min: 2,
-          max: 30,
-          divisions: 28,
-          value: _radius,
-          label: '${_radius.round()} km',
-          onChanged: (v) => setState(() => _radius = v),
-          onChangeEnd: (v) => _update({'radius_km': v.round()}),
+        AppCard(
+          padding: const EdgeInsets.fromLTRB(14, 4, 6, 4),
+          child: SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('Available to donate',
+                style: TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: const Text('Turn off to stop receiving requests'),
+            value: p.isAvailable,
+            onChanged: (v) => _update({'is_available': v}),
+          ),
         ),
-        Text(
-          'Apnar location theke ei km er moddhe request hole alert pabenn.',
-          style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+        AppCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Alert radius: ${_radius.round()} km',
+                  style: const TextStyle(fontWeight: FontWeight.w700)),
+              Slider(
+                min: 2,
+                max: 30,
+                divisions: 28,
+                value: _radius,
+                label: '${_radius.round()} km',
+                onChanged: (v) => setState(() => _radius = v),
+                onChangeEnd: (v) => _update({'radius_km': v.round()}),
+              ),
+              Text(
+                'You get alerts for requests within this distance of your saved location.',
+                style: TextStyle(fontSize: 12, color: scheme.onSurfaceVariant),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: 16),
-        OutlinedButton.icon(
-          onPressed: _updateLocation,
-          icon: const Icon(Icons.my_location),
-          label: Text(p.latitude == null
-              ? 'Location set korun'
-              : 'Amar location update korun'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          child: OutlinedButton.icon(
+            onPressed: _updateLocation,
+            icon: const Icon(Icons.my_location),
+            label: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: Text(p.latitude == null
+                  ? 'Set my location'
+                  : 'Update my location'),
+            ),
+          ),
         ),
-        const SizedBox(height: 8),
-        FilledButton.tonalIcon(
-          onPressed: _donatedToday,
-          icon: const Icon(Icons.bloodtype),
-          label: const Text('Aj blood dilam'),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+          child: FilledButton.tonalIcon(
+            onPressed: _donatedToday,
+            icon: const Icon(Icons.bloodtype),
+            label: const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: Text('I donated blood today'),
+            ),
+          ),
         ),
-        const SizedBox(height: 24),
-        TextButton.icon(
-          onPressed: () => supabase.auth.signOut(),
-          icon: const Icon(Icons.logout),
-          label: const Text('Logout'),
+        const SizedBox(height: 12),
+        Center(
+          child: TextButton.icon(
+            onPressed: () => supabase.auth.signOut(),
+            icon: const Icon(Icons.logout),
+            label: const Text('Log out'),
+          ),
         ),
       ],
     );

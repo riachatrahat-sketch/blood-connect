@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 import '../core/supa.dart';
 import '../models/models.dart';
 
-/// Real-time chat. Ek request + ek donor = ek chat room.
+/// Real-time chat. One request + one donor = one chat room.
 class ChatScreen extends StatefulWidget {
   final String requestId;
   final String donorId;
@@ -68,7 +69,9 @@ class _ChatScreenState extends State<ChatScreen> {
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: Text(widget.title)),
+      appBar: AppBar(
+        title: Text(widget.title),
+      ),
       body: Column(
         children: [
           Expanded(
@@ -81,7 +84,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 if (!snap.hasData) {
                   return const Center(child: CircularProgressIndicator());
                 }
-                // ek request e onek donor chat korte pare, tai donor_id diye filter
+                // several donors can chat on one request, so filter by donor_id
                 final msgs = snap.data!
                     .where((m) => m['donor_id'] == widget.donorId)
                     .map(ChatMessage.fromMap)
@@ -89,7 +92,18 @@ class _ChatScreenState extends State<ChatScreen> {
                     .reversed
                     .toList();
                 if (msgs.isEmpty) {
-                  return const Center(child: Text('Ekta message pathan...'));
+                  return Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.chat_bubble_outline,
+                            size: 48, color: scheme.outline),
+                        const SizedBox(height: 8),
+                        Text('Say hello and agree on where to meet.',
+                            style: TextStyle(color: scheme.onSurfaceVariant)),
+                      ],
+                    ),
+                  );
                 }
                 return ListView.builder(
                   reverse: true,
@@ -103,20 +117,43 @@ class _ChatScreenState extends State<ChatScreen> {
                           mine ? Alignment.centerRight : Alignment.centerLeft,
                       child: Container(
                         margin: const EdgeInsets.symmetric(vertical: 3),
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 8),
+                        padding: const EdgeInsets.fromLTRB(14, 9, 14, 7),
                         constraints: BoxConstraints(
                             maxWidth: MediaQuery.of(context).size.width * 0.75),
                         decoration: BoxDecoration(
                           color: mine
                               ? scheme.primary
                               : scheme.surfaceContainerHighest,
-                          borderRadius: BorderRadius.circular(14),
+                          borderRadius: BorderRadius.only(
+                            topLeft: const Radius.circular(18),
+                            topRight: const Radius.circular(18),
+                            bottomLeft: Radius.circular(mine ? 18 : 4),
+                            bottomRight: Radius.circular(mine ? 4 : 18),
+                          ),
                         ),
-                        child: Text(
-                          m.body,
-                          style: TextStyle(
-                              color: mine ? scheme.onPrimary : scheme.onSurface),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              m.body,
+                              style: TextStyle(
+                                  color: mine
+                                      ? scheme.onPrimary
+                                      : scheme.onSurface),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              DateFormat('h:mm a').format(m.createdAt),
+                              style: TextStyle(
+                                fontSize: 10,
+                                color: (mine
+                                        ? scheme.onPrimary
+                                        : scheme.onSurface)
+                                    .withOpacity(0.65),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     );
@@ -138,13 +175,23 @@ class _ChatScreenState extends State<ChatScreen> {
                       maxLength: 1000,
                       textInputAction: TextInputAction.send,
                       onSubmitted: (_) => _send(),
-                      decoration: const InputDecoration(
-                        hintText: 'Message likhun...',
+                      decoration: InputDecoration(
+                        hintText: 'Type a message...',
                         counterText: '',
                         isDense: true,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(24),
+                          borderSide: BorderSide(color: scheme.outlineVariant),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
                       ),
                     ),
                   ),
+                  const SizedBox(width: 4),
                   IconButton.filled(
                     onPressed: _sending ? null : _send,
                     icon: const Icon(Icons.send),

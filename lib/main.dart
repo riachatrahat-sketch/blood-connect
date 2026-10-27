@@ -7,11 +7,51 @@ import 'core/supa.dart';
 import 'screens/home_screen.dart';
 import 'screens/landing_screen.dart';
 import 'screens/my_requests_screen.dart';
+import 'widgets/ui.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Supabase.initialize(url: supabaseUrl, anonKey: supabaseAnonKey);
   runApp(const ProviderScope(child: BloodConnectApp()));
+}
+
+ThemeData _theme(Brightness brightness) {
+  final scheme = ColorScheme.fromSeed(seedColor: kRed, brightness: brightness);
+  final light = brightness == Brightness.light;
+  final radius = BorderRadius.circular(12);
+  return ThemeData(
+    useMaterial3: true,
+    colorScheme: scheme,
+    scaffoldBackgroundColor: light ? const Color(0xFFFAF5F5) : null,
+    appBarTheme: const AppBarTheme(
+      centerTitle: false,
+      elevation: 0,
+      scrolledUnderElevation: 0,
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: light ? Colors.white : scheme.surfaceContainer,
+      border: OutlineInputBorder(borderRadius: radius),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: radius,
+        borderSide: BorderSide(color: scheme.outlineVariant),
+      ),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+    ),
+    navigationBarTheme: NavigationBarThemeData(
+      backgroundColor: light ? Colors.white : null,
+      indicatorColor: scheme.primaryContainer,
+    ),
+  );
 }
 
 class BloodConnectApp extends StatelessWidget {
@@ -22,22 +62,18 @@ class BloodConnectApp extends StatelessWidget {
     return MaterialApp(
       title: 'BloodConnect',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFC62828)),
-        inputDecorationTheme: const InputDecorationTheme(
-          border: OutlineInputBorder(),
-        ),
-      ),
+      theme: _theme(Brightness.light),
+      darkTheme: _theme(Brightness.dark),
+      themeMode: ThemeMode.system,
       home: const AuthGate(),
     );
   }
 }
 
-/// Session onujayi screen thik kore:
-///  - session nei            => Landing (login / signup / blood lagbe)
-///  - anonymous session      => account chara requester
-///  - normal session         => donor Home
+/// Chooses the first screen from the current session:
+///  - no session         => Landing (login / sign up / need blood)
+///  - anonymous session  => account-less requester
+///  - normal session     => donor Home
 class AuthGate extends StatelessWidget {
   const AuthGate({super.key});
 
